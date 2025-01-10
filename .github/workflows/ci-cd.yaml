@@ -25,12 +25,26 @@ jobs:
       run: npm run build
 
     - name: Add SSH key and known_hosts
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+        REMOTE_USER: ${{ secrets.REMOTE_USER }}
       run: |
+        set -e
+        echo "Creating .ssh directory..."
         mkdir -p ~/.ssh
+        echo "Creating known_hosts file..."
         touch ~/.ssh/known_hosts
+
+        echo "Adding SSH private key..."
         echo "${SSH_PRIVATE_KEY}" > private_key.pem
         chmod 600 private_key.pem
+
+        echo "Adding remote host to known_hosts..."
         ssh-keyscan -H "${REMOTE_HOST}" >> ~/.ssh/known_hosts
+
+        echo "Verifying known_hosts..."
+        cat ~/.ssh/known_hosts
 
     - name: Deploy to server
       env:
@@ -38,6 +52,10 @@ jobs:
         REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
         REMOTE_USER: ${{ secrets.REMOTE_USER }}
       run: |
-        scp -i private_key.pem -r ./* ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/***/products/node-super-app-ci
-        ssh -i private_key.pem ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} 'cd /home/***/products/node-super-app-ci && npm install --production && pm2 restart all'
+        set -e
+        echo "Deploying to server..."
+        scp -i private_key.pem -r ./* ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }}:/home/${{ secrets.REMOTE_USER }}/products/node-super-app-ci
+        echo "Running remote commands..."
+        ssh -i private_key.pem ${{ secrets.REMOTE_USER }}@${{ secrets.REMOTE_HOST }} 'cd /home/${{ secrets.REMOTE_USER }}/products/node-super-app-ci && npm install --production && pm2 restart all'
+        echo "Cleaning up..."
         rm private_key.pem
